@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    @apply bg-torn-bg text-text-primary font-mono;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  #root {
+    min-height: 100svh;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-torn-surface;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-torn-muted rounded;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-neon-green/40;
+  }
+  input, select, textarea {
+    @apply outline-none;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-torn-card border border-torn-border rounded-lg shadow-card;
+  }
+  .btn-primary {
+    @apply bg-neon-green/10 border border-neon-green/50 text-neon-green px-4 py-2 rounded
+           hover:bg-neon-green/20 hover:border-neon-green hover:shadow-neon-green
+           transition-all duration-200 font-mono text-sm font-semibold cursor-pointer
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none;
+  }
+  .btn-gold {
+    @apply bg-neon-gold/10 border border-neon-gold/50 text-neon-gold px-4 py-2 rounded
+           hover:bg-neon-gold/20 hover:border-neon-gold hover:shadow-neon-gold
+           transition-all duration-200 font-mono text-sm font-semibold cursor-pointer
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-danger {
+    @apply bg-neon-red/10 border border-neon-red/50 text-neon-red px-3 py-1.5 rounded
+           hover:bg-neon-red/20 hover:border-neon-red hover:shadow-neon-red
+           transition-all duration-200 font-mono text-xs font-semibold cursor-pointer;
+  }
+  .input-field {
+    @apply bg-torn-surface border border-torn-border text-text-primary font-mono
+           px-3 py-2 rounded text-sm w-full
+           focus:border-neon-green/60 focus:bg-torn-card
+           placeholder:text-text-secondary
+           transition-colors duration-200;
+  }
+  .label {
+    @apply text-text-secondary text-xs uppercase tracking-widest font-semibold mb-1 block;
+  }
+  .neon-text-green {
+    @apply text-neon-green;
+    text-shadow: 0 0 8px rgba(0,255,136,0.6);
+  }
+  .neon-text-gold {
+    @apply text-neon-gold;
+    text-shadow: 0 0 8px rgba(255,215,0,0.6);
+  }
+  .badge {
+    @apply px-2 py-0.5 rounded text-xs font-semibold;
+  }
+  .badge-green {
+    @apply badge bg-neon-green/15 text-neon-green border border-neon-green/30;
+  }
+  .badge-gold {
+    @apply badge bg-neon-gold/15 text-neon-gold border border-neon-gold/30;
+  }
+  .badge-red {
+    @apply badge bg-neon-red/15 text-neon-red border border-neon-red/30;
+  }
+  .badge-blue {
+    @apply badge bg-neon-blue/15 text-neon-blue border border-neon-blue/30;
+  }
+  .section-title {
+    @apply text-text-secondary text-xs uppercase tracking-widest font-semibold;
+  }
+  .divider {
+    @apply border-t border-torn-border;
+  }
+}
+
+@layer utilities {
+  .text-shadow-green {
+    text-shadow: 0 0 10px rgba(0,255,136,0.5);
+  }
+  .text-shadow-gold {
+    text-shadow: 0 0 10px rgba(255,215,0,0.5);
+  }
+  .glow-dot {
+    @apply inline-block w-2 h-2 rounded-full;
+    box-shadow: 0 0 6px currentColor;
+  }
+}
