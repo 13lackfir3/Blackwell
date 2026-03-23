@@ -306,7 +306,8 @@ class CARICATURE_OT_Randomise(Operator):
         body.foot_size = rf(0.6, 1.6)
 
         from .properties import (HELMET_ITEMS, ARMOR_ITEMS, WEAPON_R_ITEMS,
-                                  WEAPON_L_ITEMS, CAPE_ITEMS, BASE_ITEMS, POSE_ITEMS)
+                                  WEAPON_L_ITEMS, CAPE_ITEMS, BASE_ITEMS,
+                                  POSE_ITEMS, BACK_ITEM_ITEMS)
         gear.helmet = random.choice([i[0] for i in HELMET_ITEMS])
         gear.armor = random.choice([i[0] for i in ARMOR_ITEMS])
         gear.weapon_right = random.choice([i[0] for i in WEAPON_R_ITEMS])
@@ -314,10 +315,10 @@ class CARICATURE_OT_Randomise(Operator):
         gear.cape = random.choice([i[0] for i in CAPE_ITEMS])
         gear.base_style = random.choice([i[0] for i in BASE_ITEMS])
         gear.pose = random.choice([i[0] for i in POSE_ITEMS])
+        gear.back_item = random.choice([i[0] for i in BACK_ITEM_ITEMS])
         gear.add_pauldrons = random.random() > 0.6
         gear.add_belt = random.random() > 0.5
         gear.add_scabbard = random.random() > 0.6
-        gear.add_backpack = random.random() > 0.7
 
         bpy.ops.caricature.create_mini("EXEC_DEFAULT")
         self.report({"INFO"}, "Character randomised!")

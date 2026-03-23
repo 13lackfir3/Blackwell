@@ -158,10 +158,14 @@ class CARICATURE_PT_Gear(CaricaturePanel, Panel):
         col.prop(gear, "cape")
 
         box = layout.box()
-        box.label(text="Weapons", icon="ORIENTATION_GIMBAL")
+        box.label(text="Hand Weapons & Items", icon="ORIENTATION_GIMBAL")
         col = box.column(align=True)
         col.prop(gear, "weapon_right", text="Right Hand")
         col.prop(gear, "weapon_left", text="Left Hand")
+
+        box = layout.box()
+        box.label(text="Back Item", icon="PACKAGE")
+        box.prop(gear, "back_item", text="")
 
         box = layout.box()
         box.label(text="Extras", icon="PLUS")
@@ -169,7 +173,6 @@ class CARICATURE_PT_Gear(CaricaturePanel, Panel):
         col.prop(gear, "add_pauldrons")
         col.prop(gear, "add_belt")
         col.prop(gear, "add_scabbard")
-        col.prop(gear, "add_backpack")
 
         layout.separator()
         layout.prop(gear, "base_style", icon="MESH_CIRCLE")
@@ -227,6 +230,9 @@ class CARICATURE_PT_Help(CaricaturePanel, Panel):
             "Sliders auto-rebuild when changed.",
             "Use 'Randomise' for quick inspiration.",
             "Archetypes pre-fill all settings.",
+            "Right Hand: 40+ weapons including guns, polearms, and exotic items.",
+            "Left Hand: 25+ items – shields, spell foci, potions, skulls…",
+            "Back Item: 22 options – wings, quivers, packs, sheathed weapons.",
             "Export scale 1000 = metres → mm (most slicers).",
             "Enable 'Thicken Base' for resin printing.",
             "Sub-division modifier adds surface detail.",

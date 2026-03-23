@@ -223,25 +223,118 @@ ARMOR_ITEMS = [
 ]
 
 WEAPON_R_ITEMS = [
-    ("NONE",         "None",            "Empty hand"),
-    ("SWORD",        "Sword",           "One-handed sword"),
-    ("DAGGER",       "Dagger",          "Short dagger"),
-    ("AXE",          "Axe",             "Hand axe"),
-    ("MACE",         "Mace",            "Flanged mace"),
-    ("WAND",         "Wand",            "Arcane wand"),
-    ("STAFF",        "Staff",           "Quarterstaff (two-handed)"),
-    ("BOW",          "Bow",             "Shortbow"),
-    ("CROSSBOW",     "Crossbow",        "Light crossbow"),
-    ("TORCH",        "Torch",           "Lit torch"),
+    # ---- Unarmed / empty ----
+    ("NONE",            "None",               "Empty hand"),
+    # ---- Swords ----
+    ("SWORD",           "Sword",              "One-handed arming sword"),
+    ("LONGSWORD",       "Longsword",          "Longer hand-and-a-half sword"),
+    ("GREATSWORD",      "Greatsword",         "Massive two-handed sword"),
+    ("RAPIER",          "Rapier",             "Slender thrusting blade with swept guard"),
+    ("SCIMITAR",        "Scimitar",           "Curved single-edged cavalry sword"),
+    ("KATANA",          "Katana",             "Elegant curved eastern blade"),
+    ("SHORTSWORD",      "Shortsword",         "Compact one-handed blade"),
+    # ---- Axes ----
+    ("AXE",             "Hand Axe",           "Single-bit hand axe"),
+    ("BATTLEAXE",       "Battleaxe",          "Large two-handed double-headed axe"),
+    ("HATCHET",         "Hatchet",            "Small lightweight hatchet"),
+    # ---- Blunt ----
+    ("MACE",            "Mace",               "Flanged mace"),
+    ("WARHAMMER",       "Warhammer",          "Heavy war hammer with poll spike"),
+    ("MAUL",            "Maul",               "Giant two-handed stone maul"),
+    ("FLAIL",           "Flail",              "Handle, chain, and spiked ball"),
+    ("MORNINGSTAR",     "Morning Star",       "Spiked metal ball on a short haft"),
+    ("CLUB",            "Club",               "Simple wooden club"),
+    # ---- Polearms ----
+    ("SPEAR",           "Spear",              "Long shaft with leaf-shaped head"),
+    ("HALBERD",         "Halberd",            "Polearm with axe blade and back-spike"),
+    ("TRIDENT",         "Trident",            "Three-pronged sea weapon"),
+    ("SCYTHE",          "Scythe",             "Curved reaping blade on long pole"),
+    ("LANCE",           "Lance",              "Heavy cavalry lance"),
+    ("GLAIVE",          "Glaive",             "Single-edged blade on a long haft"),
+    # ---- Ranged ----
+    ("BOW",             "Shortbow",           "Short recurve bow"),
+    ("LONGBOW",         "Longbow",            "Tall war longbow"),
+    ("CROSSBOW",        "Crossbow",           "Light one-handed crossbow"),
+    ("HAND_CROSSBOW",   "Hand Crossbow",      "Compact pistol-grip crossbow"),
+    ("SLING",           "Sling",              "Leather sling with stone"),
+    ("JAVELIN",         "Javelin",            "Short throwing spear"),
+    ("THROWING_KNIFE",  "Throwing Knife",     "Balanced throwing blade"),
+    # ---- Arcane / utility ----
+    ("WAND",            "Wand",               "Arcane focus wand"),
+    ("STAFF",           "Staff",              "Quarterstaff / walking staff"),
+    ("SCEPTRE",         "Sceptre",            "Ornate magical sceptre"),
+    ("TORCH",           "Torch",              "Burning torch"),
+    ("LANTERN",         "Lantern",            "Hooded oil lantern"),
+    # ---- Exotic ----
+    ("WHIP",            "Whip",               "Coiled leather whip"),
+    ("SICKLE",          "Sickle",             "Small curved harvesting sickle"),
+    ("NET",             "Net",                "Thrown weighted net"),
+    ("PISTOL",          "Flintlock Pistol",   "Single-shot flintlock pistol"),
+    ("RIFLE",           "Flintlock Rifle",    "Long-barrelled musket / rifle"),
+    ("GUNBLADE",        "Gunblade",           "Sword with integrated flintlock"),
 ]
 
 WEAPON_L_ITEMS = [
-    ("NONE",         "None",            "Empty hand"),
-    ("SHIELD_ROUND", "Round Shield",    "Round buckler / shield"),
-    ("SHIELD_TOWER", "Tower Shield",    "Large tower shield"),
-    ("DAGGER",       "Dagger",          "Off-hand dagger"),
-    ("TOME",         "Tome",            "Spell tome / book"),
-    ("ORB",          "Orb",             "Crystal orb"),
+    # ---- Empty / Shields ----
+    ("NONE",            "None",               "Empty off-hand"),
+    ("SHIELD_ROUND",    "Round Shield",       "Round buckler"),
+    ("SHIELD_TOWER",    "Tower Shield",       "Massive tower shield"),
+    ("SHIELD_KITE",     "Kite Shield",        "Pointed heater / kite shield"),
+    ("SHIELD_SPIKED",   "Spiked Shield",      "Round shield with central spike"),
+    # ---- Off-hand weapons ----
+    ("DAGGER",          "Dagger",             "Off-hand dagger"),
+    ("SHORTSWORD",      "Shortsword",         "Off-hand short sword"),
+    ("AXE",             "Hand Axe",           "Off-hand hand axe"),
+    ("PARRYING_DAGGER", "Parrying Dagger",    "Wide-bladed duelling parry dagger"),
+    # ---- Magical items ----
+    ("TOME",            "Tome",               "Spell tome / grimoire"),
+    ("ORB",             "Orb",                "Crystal scrying orb"),
+    ("WAND",            "Wand",               "Off-hand wand"),
+    ("SCROLL",          "Scroll",             "Unfurled magic scroll"),
+    ("HOLY_SYMBOL",     "Holy Symbol",        "Religious amulet / sunburst symbol"),
+    ("FOCUS_GEM",       "Arcane Focus",       "Faceted gem arcane focus"),
+    # ---- Utility / flavour ----
+    ("TORCH",           "Torch",              "Off-hand torch"),
+    ("LANTERN",         "Lantern",            "Hooded lantern"),
+    ("POTION",          "Potion Bottle",      "Drinking a potion"),
+    ("SKULL",           "Skull",              "Grim skull trophy"),
+    ("HORN",            "War Horn",           "Drinking / signal horn"),
+    ("ROPE_COIL",       "Rope Coil",          "Coiled adventurer's rope"),
+    ("SEVERED_HEAD",    "Severed Head",       "Grim trophy head"),
+    ("COIN_PURSE",      "Coin Purse",         "Bulging coin purse"),
+    ("HAND_CROSSBOW",   "Hand Crossbow",      "Off-hand compact crossbow"),
+]
+
+# ---------------------------------------------------------------------------
+# Back / carried items  (replaces the old add_backpack boolean)
+# ---------------------------------------------------------------------------
+
+BACK_ITEM_ITEMS = [
+    ("NONE",            "None",               "Nothing on the back"),
+    # ---- Storage ----
+    ("BACKPACK",        "Backpack",           "Classic adventurer's pack"),
+    ("SATCHEL",         "Satchel",            "Messenger / shoulder satchel"),
+    ("BEDROLL",         "Bedroll",            "Rolled bedroll strapped to pack"),
+    ("BARREL",          "Ale Barrel",         "Small barrel (dwarf essential)"),
+    # ---- Quivers / ammo ----
+    ("QUIVER",          "Quiver",             "Arrow quiver"),
+    ("BOLT_CASE",       "Bolt Case",          "Crossbow bolt case"),
+    # ---- Weapons on back ----
+    ("SWORD_BACK",      "Sword (Sheathed)",   "One-handed sword in back-scabbard"),
+    ("GREATSWORD_BACK", "Greatsword (Back)",  "Greatsword strapped across the back"),
+    ("AXES_CROSSED",    "Crossed Axes",       "Two axes crossed on the back"),
+    ("SHIELD_BACK",     "Shield (Carried)",   "Shield strapped flat to the back"),
+    ("SPEAR_BACK",      "Spear (Slung)",      "Spear slung diagonally"),
+    # ---- Wings ----
+    ("WINGS_FEATHER",   "Feathered Wings",    "Angel / aasimar feathered wings"),
+    ("WINGS_BAT",       "Bat Wings",          "Demon / tiefling bat wings"),
+    ("WINGS_FAIRY",     "Fairy Wings",        "Delicate fey insect wings"),
+    ("WINGS_DRAGON",    "Dragon Wings",       "Large draconic leathery wings"),
+    # ---- Magical / exotic ----
+    ("MAGIC_AURA",      "Magic Aura",         "Swirling ethereal energy tendrils"),
+    ("JETPACK",         "Gnomish Jetpack",    "Mechanical steam-powered thruster"),
+    ("INSTRUMENT_LUTE", "Lute",               "Lute strapped to back (bard)"),
+    ("CAULDRON",        "Cauldron",           "Witch's cauldron on the back"),
 ]
 
 CAPE_ITEMS = [
@@ -333,10 +426,11 @@ class CaricatureGearProps(PropertyGroup):
         default=False,
         update=_rebuild,
     )
-    add_backpack: BoolProperty(
-        name="Backpack / Quiver",
-        description="Add a backpack or quiver on the back",
-        default=False,
+    back_item: EnumProperty(
+        name="Back Item",
+        description="Item carried or worn on the back",
+        items=BACK_ITEM_ITEMS,
+        default="NONE",
         update=_rebuild,
     )
 
