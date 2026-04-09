@@ -19,11 +19,29 @@ from bpy.types import PropertyGroup
 # Callback helpers – rebuild the mini whenever a slider changes
 # ---------------------------------------------------------------------------
 
+_rebuild_scheduled = False
+
+
 def _rebuild(self, context):
-    """Generic update callback: regenerate the active mini."""
-    obj = context.active_object
-    if obj and obj.get("caricature_mini"):
-        bpy.ops.caricature.rebuild_mini("EXEC_DEFAULT")
+    """Debounced update callback — schedules a rebuild via timer so it works
+    regardless of active object and avoids bpy.ops context restrictions."""
+    global _rebuild_scheduled
+    if _rebuild_scheduled:
+        return  # already queued, don't pile up
+
+    col = bpy.data.collections.get("Caricature Minis")
+    if col is None or not any(o.get("caricature_mini") for o in col.objects):
+        return  # no mini exists yet — nothing to rebuild
+
+    _rebuild_scheduled = True
+
+    def _do_rebuild():
+        global _rebuild_scheduled
+        _rebuild_scheduled = False
+        bpy.ops.caricature.create_mini("EXEC_DEFAULT")
+        return None  # returning None means don't repeat
+
+    bpy.app.timers.register(_do_rebuild, first_interval=0.05)
 
 
 # ---------------------------------------------------------------------------

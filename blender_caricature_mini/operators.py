@@ -66,24 +66,58 @@ class CARICATURE_OT_CreateMini(Operator):
 
     def execute(self, context):
         props = context.scene.caricature_mini
-        _remove_old_mini(context)
 
-        obj = build_caricature_mini_v2(props.body, props.gear)
-        obj["caricature_mini"] = True
-        obj.name = props.character_name or "CaricatureMini"
+        # Find any existing mini object
+        col = bpy.data.collections.get(_COLLECTION_NAME)
+        existing_obj = None
+        if col:
+            minis = [o for o in col.objects if o.get("caricature_mini")]
+            existing_obj = minis[0] if minis else None
 
-        col = _get_or_create_collection(_COLLECTION_NAME)
-        _link_object(obj, col)
+        # Build new geometry (returns a detached object not yet in any collection)
+        new_obj = build_caricature_mini_v2(props.body, props.gear)
+        new_mesh = new_obj.data
+        char_name = props.character_name or "CaricatureMini"
 
-        _add_subdivision(obj, levels=1)
-        _add_smooth_shade(obj)
+        if existing_obj:
+            # --- Swap mesh data in-place ---
+            # The existing object keeps its modifiers, selection state, and
+            # collection membership; only its mesh data is replaced.
+            old_mesh = existing_obj.data
+            existing_obj.data = new_mesh
+            new_mesh.name = char_name
+            existing_obj.name = char_name
+            # Clean up the temporary object and the old mesh
+            bpy.data.objects.remove(new_obj, do_unlink=True)
+            if old_mesh.users == 0:
+                bpy.data.meshes.remove(old_mesh)
+            # Re-apply smooth shading to the new polygons
+            _add_smooth_shade(existing_obj)
+            obj = existing_obj
+        else:
+            # --- First creation: full setup ---
+            new_obj["caricature_mini"] = True
+            new_obj.name = char_name
+            new_mesh.name = char_name
+            col = _get_or_create_collection(_COLLECTION_NAME)
+            _link_object(new_obj, col)
+            _add_subdivision(new_obj, levels=1)
+            _add_smooth_shade(new_obj)
+            obj = new_obj
+            # Select only on first creation (safe; we have a proper context here)
+            try:
+                bpy.ops.object.select_all(action="DESELECT")
+                obj.select_set(True)
+                context.view_layer.objects.active = obj
+            except Exception:
+                pass
 
-        # Select and make active
-        bpy.ops.object.select_all(action="DESELECT")
-        obj.select_set(True)
-        context.view_layer.objects.active = obj
+        # Force all 3D viewports to redraw
+        for window in context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == "VIEW_3D":
+                    area.tag_redraw()
 
-        self.report({"INFO"}, f"Mini '{obj.name}' created.")
         return {"FINISHED"}
 
 
@@ -94,7 +128,6 @@ class CARICATURE_OT_RebuildMini(Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        # Reuse the create operator
         return bpy.ops.caricature.create_mini("EXEC_DEFAULT")
 
 
