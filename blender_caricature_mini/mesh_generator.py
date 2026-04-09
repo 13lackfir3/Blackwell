@@ -188,35 +188,35 @@ def _build_torso(bm, props, origin_z):
     H = props.total_height
     torso_h = H * 0.24 * props.torso_length
     sw = props.shoulder_width
-    belly = props.belly
-    chest = props.chest
 
-    shoulder_w = H * 0.11 * sw
-    hip_w = H * 0.085
-    chest_d = H * 0.06 * (1.0 + chest * 0.6)
-    belly_d = H * 0.055 * (1.0 + belly * 1.0)
+    shoulder_w = H * 0.115 * sw
+    hip_w      = H * 0.090
+    waist_w    = hip_w * 0.80 + shoulder_w * 0.20
 
-    # Build torso as 3 stacked scaled cubes (shoulder, chest, hip)
-    seg_h = torso_h / 3.0
+    belly_bump = H * 0.018 * max(props.belly, 0)
+    chest_bump = H * 0.014 * max(props.chest, 0)
 
-    # Shoulder segment
-    _add_scaled_cube(
-        bm, shoulder_w, chest_d * 0.9, seg_h,
-        center=(0, 0, origin_z + seg_h * 0.5),
-    )
-    # Chest/mid segment
-    mid_w = (shoulder_w + hip_w) / 2
-    _add_scaled_cube(
-        bm, mid_w, (chest_d + belly_d) * 0.5, seg_h,
-        center=(0, belly_d * 0.05, origin_z + seg_h * 1.5),
-    )
-    # Hip segment
-    _add_scaled_cube(
-        bm, hip_w, belly_d * 0.85, seg_h,
-        center=(0, belly_d * 0.03, origin_z + seg_h * 2.5),
+    # Lower torso: hips → waist  (rounder when belly is high)
+    _add_cone(
+        bm,
+        radius_base=hip_w + belly_bump,
+        radius_tip=waist_w,
+        depth=torso_h * 0.44,
+        center=(0, belly_bump * 0.06, origin_z + torso_h * 0.22),
+        segments=12,
     )
 
-    return origin_z + torso_h, shoulder_w, origin_z + torso_h * 0.9
+    # Upper torso: waist → shoulders  (deeper when chest is high)
+    _add_cone(
+        bm,
+        radius_base=waist_w + chest_bump,
+        radius_tip=shoulder_w,
+        depth=torso_h * 0.56,
+        center=(0, chest_bump * 0.03, origin_z + torso_h * 0.44 + torso_h * 0.28),
+        segments=12,
+    )
+
+    return origin_z + torso_h, shoulder_w, origin_z + torso_h * 0.88
 
 
 def _build_arm(bm, props, origin_z, shoulder_z, shoulder_x, side):
@@ -224,33 +224,41 @@ def _build_arm(bm, props, origin_z, shoulder_z, shoulder_x, side):
     H = props.total_height
     upper_len = H * 0.13 * props.arm_length
     lower_len = H * 0.11 * props.arm_length
-    arm_r = H * 0.022 * props.arm_thickness
-    hand_r = H * 0.028 * props.hand_size
+    arm_r = H * 0.024 * props.arm_thickness
+    hand_r = H * 0.030 * props.hand_size
 
-    arm_x = side * (shoulder_x + arm_r * 1.1)
+    # Start arm at the shoulder edge so it overlaps the torso for clean Remesh blending
+    arm_x = side * shoulder_x
 
-    # Upper arm – slight downward angle
-    ua_start_z = shoulder_z
-    ua_end_z = shoulder_z - upper_len
-    ua_mid_z = (ua_start_z + ua_end_z) / 2
-    _add_cylinder(
-        bm, radius=arm_r, depth=upper_len,
-        center=(arm_x, 0, ua_mid_z), segments=6,
+    # Shoulder ball – bridges torso edge and upper arm
+    _add_uv_sphere(
+        bm, radius=arm_r * 1.2,
+        center=(arm_x, 0, shoulder_z),
+        segments=6, rings=4,
     )
 
-    # Lower arm – slight forward angle
-    la_mid_z = ua_end_z - lower_len * 0.5
-    la_x = arm_x + side * lower_len * 0.08
+    # Upper arm
+    ua_end_z = shoulder_z - upper_len
+    ua_mid_z = (shoulder_z + ua_end_z) / 2
+    arm_x_out = side * (shoulder_x + arm_r * 0.6)
     _add_cylinder(
-        bm, radius=arm_r * 0.88, depth=lower_len,
-        center=(la_x, lower_len * 0.04, la_mid_z), segments=6,
+        bm, radius=arm_r, depth=upper_len,
+        center=(arm_x_out, 0, ua_mid_z), segments=6,
+    )
+
+    # Lower arm – slight forward/outward angle
+    la_x = arm_x_out + side * lower_len * 0.06
+    la_mid_z = ua_end_z - lower_len * 0.5
+    _add_cylinder(
+        bm, radius=arm_r * 0.85, depth=lower_len,
+        center=(la_x, lower_len * 0.03, la_mid_z), segments=6,
     )
 
     # Hand
     hand_z = ua_end_z - lower_len
     _add_uv_sphere(
         bm, radius=hand_r,
-        center=(la_x + side * lower_len * 0.04, lower_len * 0.06, hand_z),
+        center=(la_x + side * lower_len * 0.03, lower_len * 0.05, hand_z),
         segments=6, rings=4,
     )
 
@@ -260,44 +268,52 @@ def _build_leg(bm, props, origin_z, side):
     H = props.total_height
     upper_len = H * 0.22 * props.leg_length
     lower_len = H * 0.20 * props.leg_length
-    leg_r = H * 0.038 * props.leg_thickness
-    foot_r = H * 0.030 * props.foot_size
+    leg_r = H * 0.040 * props.leg_thickness
+    foot_r = H * 0.032 * props.foot_size
 
-    hip_offset_x = side * H * 0.045
+    hip_x = side * H * 0.048
 
-    # Upper leg (thigh) – slight outward then inward
-    uth_z = origin_z - upper_len * 0.5
+    # Hip ball – overlaps torso base for clean Remesh blending
+    _add_uv_sphere(
+        bm, radius=leg_r * 1.1,
+        center=(hip_x, 0, origin_z - leg_r * 0.3),
+        segments=6, rings=4,
+    )
+
+    # Upper leg (thigh)
+    knee_z = origin_z - upper_len
     _add_cylinder(
         bm, radius=leg_r, depth=upper_len,
-        center=(hip_offset_x, 0, uth_z), segments=7,
+        center=(hip_x, 0, (origin_z + knee_z) * 0.5), segments=8,
     )
 
-    knee_z = origin_z - upper_len
+    # Knee ball
+    _add_uv_sphere(
+        bm, radius=leg_r * 0.80,
+        center=(hip_x, 0, knee_z),
+        segments=6, rings=4,
+    )
 
     # Lower leg (shin) – tapered
-    shin_z = knee_z - lower_len * 0.5
+    ankle_z = knee_z - lower_len
     _add_cone(
         bm,
-        radius_base=leg_r * 0.90,
-        radius_tip=leg_r * 0.60,
+        radius_base=leg_r * 0.82,
+        radius_tip=leg_r * 0.52,
         depth=lower_len,
-        center=(hip_offset_x, 0, shin_z),
-        segments=7,
+        center=(hip_x, 0, (knee_z + ankle_z) * 0.5),
+        segments=8,
     )
 
-    ankle_z = knee_z - lower_len
-
-    # Foot – flattened sphere
-    foot_verts_before = set(bm.verts)
-    _add_uv_sphere(
-        bm, radius=foot_r,
-        center=(hip_offset_x, foot_r * 0.8, ankle_z - foot_r * 0.3),
-        segments=8, rings=5,
+    # Foot
+    _add_cone(
+        bm,
+        radius_base=foot_r,
+        radius_tip=foot_r * 0.45,
+        depth=foot_r * 2.2,
+        center=(hip_x, foot_r * 0.9, ankle_z - foot_r * 0.5),
+        segments=8,
     )
-    bm.verts.ensure_lookup_table()
-    foot_verts = [v for v in bm.verts if v not in foot_verts_before]
-    for v in foot_verts:
-        v.co.z = min(v.co.z, ankle_z - foot_r * 0.1)  # flatten bottom
 
 
 # ---------------------------------------------------------------------------

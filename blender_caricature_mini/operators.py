@@ -43,6 +43,16 @@ def _remove_old_mini(context):
             bpy.data.meshes.remove(mesh)
 
 
+def _add_remesh(obj, H):
+    """Voxel remesh merges all overlapping primitives into one smooth surface."""
+    mod = obj.modifiers.new(name="Remesh", type="REMESH")
+    mod.mode = 'VOXEL'
+    # ~4 % of total height gives ~25 voxels across the figure — good detail
+    mod.voxel_size = max(H * 0.040, 0.0008)
+    mod.adaptivity = 0.0
+    mod.use_smooth_shade = True
+
+
 def _add_subdivision(obj, levels=1):
     mod = obj.modifiers.new(name="Subdivision", type="SUBSURF")
     mod.levels = levels
@@ -132,6 +142,7 @@ class CARICATURE_OT_CreateMini(Operator):
             new_mesh.name = char_name
             col = _get_or_create_collection(_COLLECTION_NAME)
             _link_object(new_obj, col)
+            _add_remesh(new_obj, props.body.total_height)
             _add_subdivision(new_obj, levels=1)
             _add_smooth_shade(new_obj)
             obj = new_obj
