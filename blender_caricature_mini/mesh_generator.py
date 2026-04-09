@@ -1289,18 +1289,11 @@ def build_caricature_mini(body_props, gear_props):
 
     # --- Head ---
     head_r = H * 0.135 * body_props.head_scale
-    head_top = _build_head(bm, body_props, neck_top)
+    _build_head(bm, body_props, neck_top)
 
     # --- Helmet ---
-    head_origin_z = neck_top
-    _build_helmet(bm, body_props.__class__,    # pass the whole props bundle
-                  head_origin_z + head_r, head_r)
-
-    # Helmet needs the original props object – patch the call below
-    # (the function above used a placeholder; redo with correct args)
-    # Remove the incorrect call above and redo
-    # We need gear_props here – re-call properly
-    # (the build_head already placed head; now helmet on top)
+    head_center_z = neck_top + head_r
+    _build_helmet(bm, gear_props, head_center_z + head_r * 0.6, head_r)
 
     # --- Pose deformation ---
     _apply_pose(bm, gear_props.pose, H)
