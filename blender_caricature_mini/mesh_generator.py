@@ -1299,7 +1299,7 @@ def build_caricature_mini(body_props, gear_props):
     _apply_pose(bm, gear_props.pose, H)
 
     # --- Finalise ---
-    _merge_close(bm)
+    _merge_close(bm, dist=H * 0.002)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 
     mesh = bpy.data.meshes.new("CaricatureMini")
@@ -1373,7 +1373,7 @@ def build_caricature_mini_v2(body_props, gear_props):
     _apply_pose(bm, gear_props.pose, H)
 
     # Finalise
-    _merge_close(bm)
+    _merge_close(bm, dist=H * 0.002)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 
     mesh = bpy.data.meshes.new("CaricatureMini")

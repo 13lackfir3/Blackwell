@@ -54,6 +54,37 @@ def _add_smooth_shade(obj):
         poly.use_smooth = True
 
 
+def _hide_default_cube(context):
+    """Hide the default Blender startup cube so the mini isn't obscured."""
+    cube = bpy.data.objects.get("Cube")
+    if cube is None:
+        return
+    # Only touch it if it's the unmodified default: a mesh with exactly
+    # 8 verts and no custom properties or modifiers.
+    if (cube.type == "MESH"
+            and len(cube.data.vertices) == 8
+            and not cube.keys()
+            and not cube.modifiers):
+        cube.hide_set(True)  # hide in viewport (recoverable via outliner)
+
+
+def _zoom_to_mini(context):
+    """Zoom every 3D viewport to frame the active selection."""
+    for window in context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type != "VIEW_3D":
+                continue
+            # Find the region that handles 3D navigation
+            region = next((r for r in area.regions if r.type == "WINDOW"), None)
+            if region is None:
+                continue
+            try:
+                with context.temp_override(window=window, area=area, region=region):
+                    bpy.ops.view3d.view_selected(use_all_regions=False)
+            except Exception:
+                pass
+
+
 # ---------------------------------------------------------------------------
 # Create / Rebuild Mini
 # ---------------------------------------------------------------------------
@@ -104,13 +135,14 @@ class CARICATURE_OT_CreateMini(Operator):
             _add_subdivision(new_obj, levels=1)
             _add_smooth_shade(new_obj)
             obj = new_obj
-            # Select only on first creation (safe; we have a proper context here)
-            try:
-                bpy.ops.object.select_all(action="DESELECT")
-                obj.select_set(True)
-                context.view_layer.objects.active = obj
-            except Exception:
-                pass
+            # Select the new mini
+            bpy.ops.object.select_all(action="DESELECT")
+            obj.select_set(True)
+            context.view_layer.objects.active = obj
+            # Hide the default Blender startup cube so the mini is visible
+            _hide_default_cube(context)
+            # Zoom the viewport to frame the mini
+            _zoom_to_mini(context)
 
         # Force all 3D viewports to redraw
         for window in context.window_manager.windows:
@@ -134,6 +166,29 @@ class CARICATURE_OT_RebuildMini(Operator):
 # ---------------------------------------------------------------------------
 # Clear Mini
 # ---------------------------------------------------------------------------
+
+class CARICATURE_OT_ZoomToMini(Operator):
+    bl_idname = "caricature.zoom_to_mini"
+    bl_label = "Zoom to Mini"
+    bl_description = "Frame the miniature in the 3D viewport (the mini is tiny — 32 mm)"
+    bl_options = {"REGISTER"}
+
+    def execute(self, context):
+        col = bpy.data.collections.get(_COLLECTION_NAME)
+        if col is None:
+            self.report({"WARNING"}, "No mini found. Click 'Create Mini' first.")
+            return {"CANCELLED"}
+        minis = [o for o in col.objects if o.get("caricature_mini")]
+        if not minis:
+            self.report({"WARNING"}, "No mini found. Click 'Create Mini' first.")
+            return {"CANCELLED"}
+        bpy.ops.object.select_all(action="DESELECT")
+        for o in minis:
+            o.select_set(True)
+        context.view_layer.objects.active = minis[0]
+        _zoom_to_mini(context)
+        return {"FINISHED"}
+
 
 class CARICATURE_OT_ClearMini(Operator):
     bl_idname = "caricature.clear_mini"
@@ -365,6 +420,7 @@ class CARICATURE_OT_Randomise(Operator):
 _classes = [
     CARICATURE_OT_CreateMini,
     CARICATURE_OT_RebuildMini,
+    CARICATURE_OT_ZoomToMini,
     CARICATURE_OT_ClearMini,
     CARICATURE_OT_ApplyPreset,
     CARICATURE_OT_ExportSTL,

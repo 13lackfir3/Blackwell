@@ -42,6 +42,7 @@ class CARICATURE_PT_Main(CaricaturePanel, Panel):
         col.scale_y = 1.6
         col.operator("caricature.create_mini", icon="MESH_MONKEY")
         col.operator("caricature.randomise", icon="FILE_REFRESH")
+        col.operator("caricature.zoom_to_mini", icon="ZOOM_SELECTED")
         col.operator("caricature.clear_mini", icon="TRASH")
 
 
