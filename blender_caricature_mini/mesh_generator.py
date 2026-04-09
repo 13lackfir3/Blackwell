@@ -305,7 +305,7 @@ def _build_leg(bm, props, origin_z, side):
 # ---------------------------------------------------------------------------
 
 def _build_helmet(bm, props, head_top_z, head_r):
-    style = props.gear.helmet
+    style = props.helmet
     if style == "NONE":
         return
 
