@@ -100,220 +100,252 @@ def _merge_close(bm, dist=0.0001):
 
 
 # ---------------------------------------------------------------------------
-# Individual body-part builders
+# Skin-modifier body builder
 # ---------------------------------------------------------------------------
 
-def _build_head(bm, props, origin_z):
-    """Sphere-based head with mild caricature shaping."""
-    H = props.total_height
-    head_r = H * 0.135 * props.head_scale
+def _build_skin_body(body_props):
+    """Build the character body using Blender's Skin modifier for a smooth,
+    connected mesh — similar to how professional mini creators work with a
+    base mesh + morph targets.
 
-    # Basic sphere
-    sphere_verts = _add_uv_sphere(
-        bm,
-        radius=head_r,
-        center=(0, 0, origin_z + head_r),
-        segments=16,
-        rings=10,
-    )
+    Creates a skeleton of vertices with edges connecting them at anatomical
+    joints, sets per-vertex radii via the Skin vertex layer, then bakes the
+    Skin + Subdivision modifiers via the depsgraph to produce a smooth mesh.
 
-    # Squash/stretch width and depth
-    w = props.head_width
-    d = props.head_depth
-    for v in sphere_verts:
-        v.co.x *= w
-        v.co.y *= d
+    Returns (bpy.types.Object, dict) — the baked body object and a landmark
+    dict with Z/X positions needed for gear placement.
+    """
+    H = body_props.total_height
 
-    # Jaw widening – push lower-hemisphere verts outward in X
-    jw = props.jaw_width * head_r * 0.25
-    for v in sphere_verts:
-        local_z = v.co.z - (origin_z + head_r)
-        if local_z < -head_r * 0.1:
-            t = abs(local_z / head_r)
-            v.co.x += math.copysign(jw * t, v.co.x) if abs(v.co.x) > 0.001 else 0
-
-    # Brow ridge – push upper-front verts forward
-    br = props.brow_ridge * head_r * 0.15
-    for v in sphere_verts:
-        local_z = v.co.z - (origin_z + head_r)
-        if local_z > head_r * 0.1 and v.co.y > 0:
-            t = local_z / head_r
-            v.co.y += br * t
-
-    # Nose bump (simple protrusion on front)
-    ns = props.nose_size * head_r * 0.12
-    nose_cx = 0
-    nose_cy = head_r * d
-    nose_cz = origin_z + head_r * 0.85
-    _add_uv_sphere(
-        bm,
-        radius=head_r * 0.08 + ns,
-        center=(nose_cx, nose_cy + ns * 0.5, nose_cz),
-        segments=6,
-        rings=4,
-    )
-
-    # Ears (small spheres on sides)
-    ear_r = head_r * 0.08 + props.ear_size * head_r * 0.1
-    for side in (-1, 1):
-        _add_uv_sphere(
-            bm,
-            radius=ear_r,
-            center=(side * head_r * w, 0, origin_z + head_r * 0.95),
-            segments=6,
-            rings=4,
-        )
-
-    # Chin point
-    ch = props.chin_length * head_r * 0.15
-    for v in sphere_verts:
-        local_z = v.co.z - (origin_z + head_r)
-        if local_z < -head_r * 0.4:
-            t = (-local_z - head_r * 0.4) / (head_r * 0.6)
-            v.co.z -= ch * t * t
-
-    return origin_z + head_r * 2.0
-
-
-def _build_neck(bm, props, origin_z):
-    H = props.total_height
-    neck_r = H * 0.038
-    neck_h = H * 0.048
-    _add_cylinder(bm, radius=neck_r, depth=neck_h,
-                  center=(0, 0, origin_z + neck_h * 0.5), segments=8)
-    return origin_z + neck_h
-
-
-def _build_torso(bm, props, origin_z):
-    H = props.total_height
-    torso_h = H * 0.24 * props.torso_length
-    sw = props.shoulder_width
-
+    # -- Proportions derived from sliders --------------------------------
+    head_r    = H * 0.135 * body_props.head_scale
+    head_w    = body_props.head_width
+    head_d    = body_props.head_depth
+    neck_r    = H * 0.038
+    neck_h    = H * 0.048
+    torso_h   = H * 0.24 * body_props.torso_length
+    sw        = body_props.shoulder_width
     shoulder_w = H * 0.115 * sw
-    hip_w      = H * 0.090
-    waist_w    = hip_w * 0.80 + shoulder_w * 0.20
+    hip_w     = H * 0.090
+    belly     = max(body_props.belly, 0)
+    chest     = max(body_props.chest, 0)
+    arm_len_u = H * 0.13 * body_props.arm_length
+    arm_len_l = H * 0.11 * body_props.arm_length
+    arm_r     = H * 0.024 * body_props.arm_thickness
+    hand_r_s  = H * 0.030 * body_props.hand_size
+    leg_len_u = H * 0.22 * body_props.leg_length
+    leg_len_l = H * 0.20 * body_props.leg_length
+    leg_r     = H * 0.040 * body_props.leg_thickness
+    foot_r    = H * 0.032 * body_props.foot_size
 
-    belly_bump = H * 0.018 * max(props.belly, 0)
-    chest_bump = H * 0.014 * max(props.chest, 0)
+    # -- Key Z positions -------------------------------------------------
+    base_z       = 0.0
+    foot_z       = base_z + H * 0.01
+    ankle_z      = foot_z + foot_r * 1.2
+    knee_z       = ankle_z + leg_len_l
+    hip_z        = knee_z + leg_len_u
+    torso_bot_z  = hip_z
+    waist_z      = torso_bot_z + torso_h * 0.44
+    chest_z      = torso_bot_z + torso_h * 0.78
+    shoulder_z   = torso_bot_z + torso_h
+    neck_bot_z   = shoulder_z
+    neck_top_z   = neck_bot_z + neck_h
+    head_ctr_z   = neck_top_z + head_r
+    head_top_z   = neck_top_z + head_r * 2.0
 
-    # Lower torso: hips → waist  (rounder when belly is high)
-    _add_cone(
-        bm,
-        radius_base=hip_w + belly_bump,
-        radius_tip=waist_w,
-        depth=torso_h * 0.44,
-        center=(0, belly_bump * 0.06, origin_z + torso_h * 0.22),
-        segments=12,
-    )
+    # -- Build skeleton mesh with bmesh ----------------------------------
+    bm = bmesh.new()
 
-    # Upper torso: waist → shoulders  (deeper when chest is high)
-    _add_cone(
-        bm,
-        radius_base=waist_w + chest_bump,
-        radius_tip=shoulder_w,
-        depth=torso_h * 0.56,
-        center=(0, chest_bump * 0.03, origin_z + torso_h * 0.44 + torso_h * 0.28),
-        segments=12,
-    )
+    # Ensure skin data layer exists
+    if not bm.verts.layers.skin:
+        bm.verts.layers.skin.new()
+    skin_layer = bm.verts.layers.skin[0]
 
-    return origin_z + torso_h, shoulder_w, origin_z + torso_h * 0.88
+    verts = {}  # name → BMVert
 
+    def add_vert(name, co, rx, ry):
+        """Add a vertex and set its skin radii."""
+        v = bm.verts.new(co)
+        sd = v[skin_layer]
+        sd.radius = (rx, ry)
+        verts[name] = v
+        return v
 
-def _build_arm(bm, props, origin_z, shoulder_z, shoulder_x, side):
-    """Build one arm. side = +1 (right) or -1 (left)."""
-    H = props.total_height
-    upper_len = H * 0.13 * props.arm_length
-    lower_len = H * 0.11 * props.arm_length
-    arm_r = H * 0.024 * props.arm_thickness
-    hand_r = H * 0.030 * props.hand_size
+    def connect(a, b):
+        bm.edges.new((verts[a], verts[b]))
 
-    # Start arm at the shoulder edge so it overlaps the torso for clean Remesh blending
-    arm_x = side * shoulder_x
+    # --- Spine (bottom→top) ---
+    pelvis_rx = hip_w * 0.9
+    pelvis_ry = hip_w * 0.65 + belly * H * 0.012
+    add_vert("pelvis", (0, 0, hip_z), pelvis_rx, pelvis_ry)
 
-    # Shoulder ball – bridges torso edge and upper arm
-    _add_uv_sphere(
-        bm, radius=arm_r * 1.2,
-        center=(arm_x, 0, shoulder_z),
-        segments=6, rings=4,
-    )
+    waist_rx = hip_w * 0.7
+    waist_ry = hip_w * 0.55 + belly * H * 0.016
+    add_vert("waist", (0, belly * H * 0.003, waist_z), waist_rx, waist_ry)
+    connect("pelvis", "waist")
 
-    # Upper arm
-    ua_end_z = shoulder_z - upper_len
-    ua_mid_z = (shoulder_z + ua_end_z) / 2
-    arm_x_out = side * (shoulder_x + arm_r * 0.6)
-    _add_cylinder(
-        bm, radius=arm_r, depth=upper_len,
-        center=(arm_x_out, 0, ua_mid_z), segments=6,
-    )
+    chest_rx = shoulder_w * 0.85
+    chest_ry = hip_w * 0.65 + chest * H * 0.014
+    add_vert("chest", (0, chest * H * 0.002, chest_z), chest_rx, chest_ry)
+    connect("waist", "chest")
 
-    # Lower arm – slight forward/outward angle
-    la_x = arm_x_out + side * lower_len * 0.06
-    la_mid_z = ua_end_z - lower_len * 0.5
-    _add_cylinder(
-        bm, radius=arm_r * 0.85, depth=lower_len,
-        center=(la_x, lower_len * 0.03, la_mid_z), segments=6,
-    )
+    shoulder_rx = shoulder_w * 0.80
+    shoulder_ry = hip_w * 0.50
+    add_vert("shoulders", (0, 0, shoulder_z), shoulder_rx, shoulder_ry)
+    connect("chest", "shoulders")
 
-    # Hand
-    hand_z = ua_end_z - lower_len
-    _add_uv_sphere(
-        bm, radius=hand_r,
-        center=(la_x + side * lower_len * 0.03, lower_len * 0.05, hand_z),
-        segments=6, rings=4,
-    )
+    # Neck
+    add_vert("neck_bot", (0, 0, neck_bot_z), neck_r, neck_r)
+    connect("shoulders", "neck_bot")
+    add_vert("neck_top", (0, 0, neck_top_z), neck_r * 0.9, neck_r * 0.9)
+    connect("neck_bot", "neck_top")
 
+    # Head
+    head_rx = head_r * head_w
+    head_ry = head_r * head_d
+    add_vert("head_center", (0, 0, head_ctr_z), head_rx, head_ry)
+    connect("neck_top", "head_center")
+    add_vert("head_top", (0, 0, head_top_z), head_rx * 0.7, head_ry * 0.7)
+    connect("head_center", "head_top")
 
-def _build_leg(bm, props, origin_z, side):
-    """Build one leg. side = +1 (right) or -1 (left)."""
-    H = props.total_height
-    upper_len = H * 0.22 * props.leg_length
-    lower_len = H * 0.20 * props.leg_length
-    leg_r = H * 0.040 * props.leg_thickness
-    foot_r = H * 0.032 * props.foot_size
+    # Jaw / chin branch
+    chin_len = body_props.chin_length * head_r * 0.2
+    jaw_w = body_props.jaw_width
+    chin_rx = head_rx * (0.35 + jaw_w * 0.15)
+    chin_ry = head_ry * 0.30
+    add_vert("chin", (0, head_ry * 0.15, head_ctr_z - head_r * 0.7 - chin_len),
+             chin_rx, chin_ry)
+    connect("head_center", "chin")
 
-    hip_x = side * H * 0.048
+    # Brow ridge branch
+    brow = body_props.brow_ridge
+    brow_y = head_ry * 0.85 + brow * head_r * 0.12
+    add_vert("brow", (0, brow_y, head_ctr_z + head_r * 0.35),
+             head_rx * 0.65, head_r * 0.15)
+    connect("head_center", "brow")
 
-    # Hip ball – overlaps torso base for clean Remesh blending
-    _add_uv_sphere(
-        bm, radius=leg_r * 1.1,
-        center=(hip_x, 0, origin_z - leg_r * 0.3),
-        segments=6, rings=4,
-    )
+    # Nose branch
+    ns = body_props.nose_size
+    nose_r = head_r * 0.08 + ns * head_r * 0.10
+    add_vert("nose", (0, head_ry + nose_r * 0.6, head_ctr_z - head_r * 0.15),
+             nose_r, nose_r)
+    connect("head_center", "nose")
 
-    # Upper leg (thigh)
-    knee_z = origin_z - upper_len
-    _add_cylinder(
-        bm, radius=leg_r, depth=upper_len,
-        center=(hip_x, 0, (origin_z + knee_z) * 0.5), segments=8,
-    )
+    # Ear branches
+    ear_s = body_props.ear_size
+    ear_r = head_r * 0.06 + ear_s * head_r * 0.08
+    for side_name, sx in (("ear_L", -1), ("ear_R", 1)):
+        add_vert(side_name, (sx * (head_rx + ear_r * 0.3), 0, head_ctr_z),
+                 ear_r, ear_r * 0.5)
+        connect("head_center", side_name)
 
-    # Knee ball
-    _add_uv_sphere(
-        bm, radius=leg_r * 0.80,
-        center=(hip_x, 0, knee_z),
-        segments=6, rings=4,
-    )
+    # --- Arms (both sides) ---
+    for side_name, sx in (("R", 1), ("L", -1)):
+        s_x = sx * shoulder_w
+        add_vert(f"shoulder_{side_name}", (s_x, 0, shoulder_z),
+                 arm_r * 1.4, arm_r * 1.4)
+        connect("shoulders", f"shoulder_{side_name}")
 
-    # Lower leg (shin) – tapered
-    ankle_z = knee_z - lower_len
-    _add_cone(
-        bm,
-        radius_base=leg_r * 0.82,
-        radius_tip=leg_r * 0.52,
-        depth=lower_len,
-        center=(hip_x, 0, (knee_z + ankle_z) * 0.5),
-        segments=8,
-    )
+        elbow_z = shoulder_z - arm_len_u
+        elbow_x = sx * (shoulder_w + arm_r * 0.5)
+        add_vert(f"elbow_{side_name}", (elbow_x, 0, elbow_z),
+                 arm_r * 0.9, arm_r * 0.9)
+        connect(f"shoulder_{side_name}", f"elbow_{side_name}")
 
-    # Foot
-    _add_cone(
-        bm,
-        radius_base=foot_r,
-        radius_tip=foot_r * 0.45,
-        depth=foot_r * 2.2,
-        center=(hip_x, foot_r * 0.9, ankle_z - foot_r * 0.5),
-        segments=8,
-    )
+        wrist_z = elbow_z - arm_len_l
+        wrist_x = elbow_x + sx * arm_len_l * 0.06
+        add_vert(f"wrist_{side_name}", (wrist_x, arm_len_l * 0.03, wrist_z),
+                 arm_r * 0.7, arm_r * 0.7)
+        connect(f"elbow_{side_name}", f"wrist_{side_name}")
+
+        hand_x = wrist_x + sx * hand_r_s * 0.3
+        hand_z = wrist_z - hand_r_s * 0.8
+        add_vert(f"hand_{side_name}", (hand_x, arm_len_l * 0.05, hand_z),
+                 hand_r_s, hand_r_s * 0.7)
+        connect(f"wrist_{side_name}", f"hand_{side_name}")
+
+    # --- Legs (both sides) ---
+    for side_name, sx in (("R", 1), ("L", -1)):
+        hip_x = sx * hip_w * 0.55
+        add_vert(f"hip_{side_name}", (hip_x, 0, hip_z),
+                 leg_r * 1.1, leg_r * 1.1)
+        connect("pelvis", f"hip_{side_name}")
+
+        add_vert(f"knee_{side_name}", (hip_x, 0, knee_z),
+                 leg_r * 0.85, leg_r * 0.85)
+        connect(f"hip_{side_name}", f"knee_{side_name}")
+
+        add_vert(f"ankle_{side_name}", (hip_x, 0, ankle_z),
+                 leg_r * 0.55, leg_r * 0.55)
+        connect(f"knee_{side_name}", f"ankle_{side_name}")
+
+        # Foot — forward-pointing
+        add_vert(f"toe_{side_name}", (hip_x, foot_r * 1.6, foot_z),
+                 foot_r * 0.6, foot_r * 0.35)
+        connect(f"ankle_{side_name}", f"toe_{side_name}")
+
+    # Mark the pelvis as the root of the skin skeleton
+    verts["pelvis"][skin_layer].use_root = True
+
+    bm.verts.ensure_lookup_table()
+    bm.edges.ensure_lookup_table()
+
+    # --- Write skeleton to a temporary mesh object ----------------------
+    skel_mesh = bpy.data.meshes.new("_SkinBody_skeleton")
+    bm.to_mesh(skel_mesh)
+    bm.free()
+    skel_mesh.update()
+
+    skel_obj = bpy.data.objects.new("_SkinBody", skel_mesh)
+
+    # Add Skin modifier
+    skin_mod = skel_obj.modifiers.new(name="Skin", type="SKIN")
+
+    # Add Subdivision for smoothness
+    sub_mod = skel_obj.modifiers.new(name="Subdivision", type="SUBSURF")
+    sub_mod.levels = 2
+    sub_mod.render_levels = 2
+
+    # --- Bake modifiers via depsgraph -----------------------------------
+    # Temporarily link to scene so depsgraph can evaluate
+    scene_col = bpy.context.scene.collection
+    scene_col.objects.link(skel_obj)
+    bpy.context.view_layer.update()
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    eval_obj = skel_obj.evaluated_get(depsgraph)
+    baked_mesh = bpy.data.meshes.new_from_object(eval_obj)
+
+    # Clean up the temporary skeleton object
+    scene_col.objects.unlink(skel_obj)
+    bpy.data.objects.remove(skel_obj, do_unlink=True)
+    bpy.data.meshes.remove(skel_mesh)
+
+    # Create the final body object with the baked mesh
+    body_obj = bpy.data.objects.new("_SkinBody_baked", baked_mesh)
+
+    # Build landmarks dict for gear placement
+    arm_x = shoulder_w + arm_r * 0.5
+    arm_total = arm_len_u + arm_len_l
+    hand_z_val = shoulder_z - arm_total
+    landmarks = {
+        "H": H,
+        "head_r": head_r,
+        "head_top_z": head_top_z,
+        "head_center_z": head_ctr_z,
+        "neck_top_z": neck_top_z,
+        "shoulder_z": shoulder_z,
+        "shoulder_w": shoulder_w,
+        "torso_top_z": shoulder_z,
+        "torso_bottom_z": torso_bot_z,
+        "hand_z": hand_z_val,
+        "hand_y": arm_len_l * 0.05,
+        "arm_x": arm_x,
+        "hip_z": hip_z,
+        "base_z": base_z,
+    }
+
+    return body_obj, landmarks
 
 
 # ---------------------------------------------------------------------------
@@ -1238,157 +1270,71 @@ def _apply_pose(bm, pose, H):
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def build_caricature_mini(body_props, gear_props):
-    """
-    Build the full caricature mini mesh.
-    Returns a new Blender mesh object (not yet linked to any collection).
-    """
-    bm = bmesh.new()
-
-    H = body_props.total_height
-
-    # --- Base ---
-    base_z = 0.0
-    _build_base(bm, gear_props.base_style, H, base_z)
-
-    # --- Legs ---
-    leg_top_z = H * 0.45 * body_props.leg_length + H * 0.028
-    for side in (1, -1):
-        _build_leg(bm, body_props, leg_top_z, side)
-
-    # --- Torso ---
-    torso_bottom_z = leg_top_z
-    torso_top_z, shoulder_w, pauldron_z = _build_torso(bm, body_props, torso_bottom_z)
-
-    # --- Armour layer ---
-    _build_armor_layer(bm, body_props, gear_props, torso_bottom_z, torso_top_z)
-
-    # --- Cape ---
-    _build_cape(bm, body_props, gear_props, torso_top_z, torso_bottom_z)
-
-    # --- Arms ---
-    arm_z_base = torso_top_z
-    arm_H = H * 0.13 * body_props.arm_length
-    hand_z_r = arm_z_base - arm_H - H * 0.11 * body_props.arm_length
-    hand_z_l = hand_z_r
-    arm_x_r = shoulder_w + H * 0.022 * body_props.arm_thickness * 1.1
-    arm_x_l = -arm_x_r
-
-    _build_arm(bm, body_props, arm_z_base, arm_z_base, shoulder_w, 1)
-    _build_arm(bm, body_props, arm_z_base, arm_z_base, shoulder_w, -1)
-
-    # --- Weapons ---
-    hand_y = H * 0.06
-    _build_weapon(
-        bm, gear_props.weapon_right,
-        arm_x_r, hand_y, hand_z_r, 1, H,
-    )
-    _build_weapon(
-        bm, gear_props.weapon_left,
-        arm_x_l, hand_y, hand_z_l, -1, H,
-    )
-
-    # Scabbard on hip
-    if gear_props.add_scabbard:
-        scabbard_x = shoulder_w * 0.7
-        _add_cone(bm, radius_base=H * 0.010, radius_tip=H * 0.007,
-                  depth=H * 0.18,
-                  center=(scabbard_x, H * 0.04, torso_bottom_z + H * 0.12),
-                  segments=5)
-
-    # Back item
-    _build_back_item(bm, gear_props.back_item, torso_top_z, torso_bottom_z, H, shoulder_w)
-
-    # --- Neck ---
-    neck_bottom = torso_top_z
-    neck_top = _build_neck(bm, body_props, neck_bottom)
-
-    # --- Head ---
-    head_r = H * 0.135 * body_props.head_scale
-    _build_head(bm, body_props, neck_top)
-
-    # --- Helmet ---
-    head_center_z = neck_top + head_r
-    _build_helmet(bm, gear_props, head_center_z + head_r * 0.6, head_r)
-
-    # --- Pose deformation ---
-    _apply_pose(bm, gear_props.pose, H)
-
-    # --- Finalise ---
-    _merge_close(bm, dist=H * 0.002)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-
-    mesh = bpy.data.meshes.new("CaricatureMini")
-    bm.to_mesh(mesh)
-    bm.free()
-    mesh.update()
-
-    obj = bpy.data.objects.new("CaricatureMini", mesh)
-    return obj
-
-
 def build_caricature_mini_v2(body_props, gear_props):
     """
-    Corrected entry-point that properly calls helmet with gear_props.
-    Replaces build_caricature_mini.
-    """
-    bm = bmesh.new()
+    Build a caricature mini using the Skin modifier for a smooth, connected
+    body mesh, then add gear primitives on top.
 
-    H = body_props.total_height
+    Pipeline:
+      1. Build body skeleton → Skin + Subdiv → depsgraph bake → smooth body mesh
+      2. Load baked body into bmesh
+      3. Add gear primitives (weapons, helmet, armor, cape, back item, base)
+      4. Apply pose, merge, finalize
+      5. Return detached Blender object
+    """
+    # --- Step 1: Build the skin-modifier body ---------------------------
+    body_obj, lm = _build_skin_body(body_props)
+
+    # --- Step 2: Load baked body mesh into bmesh for gear additions -----
+    bm = bmesh.new()
+    bm.from_mesh(body_obj.data)
+
+    # Clean up the temporary body object (keep the mesh, it's in bm now)
+    body_mesh = body_obj.data
+    bpy.data.objects.remove(body_obj, do_unlink=True)
+    bpy.data.meshes.remove(body_mesh)
+
+    H            = lm["H"]
+    head_r       = lm["head_r"]
+    head_top_z   = lm["head_top_z"]
+    shoulder_z   = lm["shoulder_z"]
+    shoulder_w   = lm["shoulder_w"]
+    torso_top_z  = lm["torso_top_z"]
+    torso_bot_z  = lm["torso_bottom_z"]
+    hand_z       = lm["hand_z"]
+    hand_y       = lm["hand_y"]
+    arm_x        = lm["arm_x"]
+    base_z       = lm["base_z"]
+
+    # --- Step 3: Add gear primitives ------------------------------------
 
     # Base
-    base_z = 0.0
     _build_base(bm, gear_props.base_style, H, base_z)
 
-    # Legs
-    leg_top_z = H * 0.45 * body_props.leg_length + H * 0.028
-    for side in (1, -1):
-        _build_leg(bm, body_props, leg_top_z, side)
-
-    # Torso
-    torso_bottom_z = leg_top_z
-    torso_top_z, shoulder_w, _ = _build_torso(bm, body_props, torso_bottom_z)
-
-    # Armour
-    _build_armor_layer(bm, body_props, gear_props, torso_bottom_z, torso_top_z)
+    # Armour layer
+    _build_armor_layer(bm, body_props, gear_props, torso_bot_z, torso_top_z)
 
     # Cape
-    _build_cape(bm, body_props, gear_props, torso_top_z, torso_bottom_z)
+    _build_cape(bm, body_props, gear_props, torso_top_z, torso_bot_z)
 
-    # Arms & weapons
-    arm_x = shoulder_w + H * 0.022 * body_props.arm_thickness * 1.1
-    arm_len = H * 0.13 * body_props.arm_length + H * 0.11 * body_props.arm_length
-    hand_z = torso_top_z - arm_len
-    hand_y = H * 0.06
-
-    _build_arm(bm, body_props, torso_top_z, torso_top_z, shoulder_w, 1)
-    _build_arm(bm, body_props, torso_top_z, torso_top_z, shoulder_w, -1)
-
+    # Weapons
     _build_weapon(bm, gear_props.weapon_right, arm_x, hand_y, hand_z, 1, H)
     _build_weapon(bm, gear_props.weapon_left, -arm_x, hand_y, hand_z, -1, H)
 
+    # Scabbard
     if gear_props.add_scabbard:
         _add_cone(bm, H * 0.010, H * 0.007, H * 0.18,
-                  (shoulder_w * 0.7, H * 0.04, torso_bottom_z + H * 0.12), 5)
+                  (shoulder_w * 0.7, H * 0.04, torso_bot_z + H * 0.12), 5)
 
-    # Back item (replaces simple add_backpack bool)
-    _build_back_item(bm, gear_props.back_item, torso_top_z, torso_bottom_z, H, shoulder_w)
+    # Back item
+    _build_back_item(bm, gear_props.back_item, torso_top_z, torso_bot_z, H, shoulder_w)
 
-    # Neck
-    neck_top = _build_neck(bm, body_props, torso_top_z)
+    # Helmet (body already includes head from skin modifier)
+    _build_helmet(bm, gear_props, head_top_z - head_r * 0.4, head_r)
 
-    # Head
-    head_r = H * 0.135 * body_props.head_scale
-    _build_head(bm, body_props, neck_top)
-
-    # Helmet
-    head_center_z = neck_top + head_r
-    _build_helmet(bm, gear_props, head_center_z + head_r * 0.6, head_r)
-
-    # Pose
+    # --- Step 4: Pose, merge, finalize ----------------------------------
     _apply_pose(bm, gear_props.pose, H)
 
-    # Finalise
     _merge_close(bm, dist=H * 0.002)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 
